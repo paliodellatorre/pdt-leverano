@@ -9,6 +9,19 @@ DATABASE = "database.db"
 
 
 # -----------------------
+# FILTRO VALUTA €
+# -----------------------
+
+@app.template_filter("currency")
+def currency_filter(value):
+    try:
+        value = float(value)
+        return f"€ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except:
+        return value
+
+
+# -----------------------
 # DATABASE
 # -----------------------
 
@@ -134,10 +147,11 @@ def health():
 
 
 # -----------------------
-# START APP (RENDER)
+# START APP (IMPORTANTE PER RENDER)
 # -----------------------
 
 if __name__ == "__main__":
+
     if not os.path.exists(DATABASE):
         init_db()
     else:
@@ -148,5 +162,6 @@ if __name__ == "__main__":
 
     app.run(
         host="0.0.0.0",
-        port=port
+        port=port,
+        debug=False
     )
