@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Admin{% endblock %}
+{% block content %}
+<section class="dashboard-head">
+    <div>
+        <div class="badge">Admin</div>
+        <h1>Dashboard iscrizioni</h1>
+        <p class="status-line">
+            Stato iscrizioni:
+            {% if registrations_open %}
+                <strong class="text-success">APERTE</strong>
+            {% else %}
+                <strong class="text-danger">CHIUSE</strong>
+            {% endif %}
+            {% if closed_message %}<span>— {{ closed_message }}</span>{% endif %}
+        </p>
+    </div>
+    <div class="dashboard-actions">
+        <a class="ghost-btn" href="{{ url_for('export_excel') }}">Scarica Excel</a>
+        <a class="ghost-btn" href="{{ url_for('export_players_excel') }}">Excel anagrafica giocatori</a>
+        <a class="ghost-btn" href="{{ url_for('export_rioni_shirts_excel') }}">Excel magliette per rione</a>
+        <a class="ghost-btn" href="{{ url_for('admin_logout') }}">Esci</a>
+    </div>
+</section>
+
+<section class="section-card controls-card">
+    <div class="controls-grid">
+        <form method="post" action="{{ url_for('toggle_registrations') }}">
+            <button class="submit-btn danger-btn" type="submit">
+                {% if registrations_open %}Chiudi iscrizioni{% else %}Riapri iscrizioni{% endif %}
+            </button>
+        </form>
+
+        <form method="post" action="{{ url_for('set_auto_close') }}" class="auto-close-form">
+            <label>Data chiusura automatica</label>
+            <input type="datetime-local" name="auto_close_at" value="{{ auto_close_at }}">
+            <div class="inline-buttons">
+                <button class="ghost-btn" type="submit">Salva data</button>
+            </div>
+        </form>
+    </div>
+</section>
+
+<section class="summary-grid">
+    {% for item in summary %}
+        <div class="summary-card">
+            <h3>{{ item['sport'] }}</h3>
+            <p>Iscrizioni: <strong>{{ item['registrations_count'] }}</strong></p>
+            <p>Incassi: <strong>{{ item['total_collected']|default(0, true)|currency }}</strong></p>
+            <p>Maglie: <strong>{{ item['shirts_count'] or 0 }}</strong></p>
+        </div>
+    {% endfor %}
+</section>
+
+<section class="table-card">
+    <h2>Conteggio magliette rione per rione</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Rione</th>
+                    {% for size in shirt_sizes %}
+                        <th>{{ size }}</th>
+                    {% endfor %}
+                    <th>Totale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in rioni_shirts %}
+                    <tr>
+                        <td>{{ item.rione }}</td>
+                        {% for size in shirt_sizes %}
+                            <td>{{ item.sizes[size] }}</td>
+                        {% endfor %}
+                        <td><strong>{{ item.total }}</strong></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="{{ shirt_sizes|length + 2 }}">Nessun dato disponibile.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="table-card">
+    <form method="get" class="filter-row">
+        <select name="sport">
+            <option value="">Tutti gli sport</option>
+            {% for sport_name in sports.keys() %}
+                <option value="{{ sport_name }}" {% if selected_sport == sport_name %}selected{% endif %}>{{ sport_name }}</option>
+            {% endfor %}
+        </select>
+        <button class="ghost-btn" type="submit">Filtra</button>
+    </form>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Sport</th>
+                    <th>Rione</th>
+                    <th>1° giocatore</th>
+                    <th>Taglia 1</th>
+                    <th>2° giocatore</th>
+                    <th>Taglia 2</th>
+                    <th>Email</th>
+                    <th>Totale</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row['created_at'] }}</td>
+                        <td>{{ row['sport'] }}</td>
+                        <td>{{ row['rione'] }}</td>
+                        <td>{{ row['player1_name'] }}</td>
+                        <td>{{ row['player1_shirt_size'] or '-' }}</td>
+                        <td>{{ row['player2_name'] or '-' }}</td>
+                        <td>{{ row['player2_shirt_size'] or '-' }}</td>
+                        <td>{{ row['email'] }}</td>
+                        <td>{{ row['total_fee']|currency }}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <a class="ghost-btn small-btn" href="{{ url_for('edit_registration', registration_id=row['id']) }}">Modifica</a>
+                                <form method="post" action="{{ url_for('delete_registration', registration_id=row['id']) }}" onsubmit="return confirm('Eliminare questa iscrizione?');">
+                                    <button class="ghost-btn small-btn danger-outline" type="submit">Elimina</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="10">Nessuna iscrizione trovata.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
