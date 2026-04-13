@@ -38,9 +38,9 @@ RIONI = [
     "CENTRO",
     "CONSOLAZIONE",
     "PATULA - CUPA QUARTARARU",
-    ]
-    
-SPORTS = {
+]
+
+BASE_SPORTS = {
     "Calcio": {"fee": 10.0, "is_double": False},
     "Padel": {"fee": 40.0, "is_double": True},
     "Burraco": {"fee": 5.0, "is_double": True},
@@ -119,10 +119,29 @@ def set_setting(key: str, value: str) -> None:
     db = get_db()
     ensure_db_schema()
     db.execute(
-        "INSERT INTO app_settings(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        "INSERT INTO app_settings(key, value) VALUES(?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         (key, value),
     )
     db.commit()
+
+
+def get_sports_config() -> dict[str, dict[str, float | bool]]:
+    sports: dict[str, dict[str, float | bool]] = {}
+    for sport_name, config in BASE_SPORTS.items():
+        stored_price = get_setting(f"sport_price::{sport_name}", "")
+        fee = config["fee"]
+        if stored_price:
+            try:
+                fee = float(stored_price)
+            except ValueError:
+                fee = config["fee"]
+
+        sports[sport_name] = {
+            "fee": fee,
+            "is_double": bool(config["is_double"]),
+        }
+    return sports
 
 
 def get_registration_open_status() -> tuple[bool, str]:
@@ -155,15 +174,16 @@ def login_required(view_func):
 
 @app.template_filter("currency")
 def currency_filter(value: float) -> str:
-    return f"€ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"€ {float(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 @app.route("/")
 def index():
+    sports = get_sports_config()
     is_open, closed_message = get_registration_open_status()
     return render_template(
         "index.html",
-        sports=SPORTS,
+        sports=sports,
         rioni=RIONI,
         belonging_options=BELONGING_OPTIONS,
         shirt_price=SHIRT_PRICE,
@@ -176,6 +196,7 @@ def index():
 
 @app.post("/submit")
 def submit_registration():
+    sports = get_sports_config()
     is_open, closed_message = get_registration_open_status()
     if not is_open:
         flash(closed_message or "Le iscrizioni sono chiuse.", "error")
@@ -183,7 +204,7 @@ def submit_registration():
 
     form = request.form
     sport_name = form.get("sport", "")
-    sport = SPORTS.get(sport_name)
+    sport = sports.get(sport_name)
     if not sport:
         flash("Seleziona uno sport valido.", "error")
         return redirect(url_for("index"))
@@ -247,7 +268,7 @@ def submit_registration():
     if not wants_shirt_2:
         player2_shirt_size = ""
 
-    base_fee = sport["fee"]
+    base_fee = float(sport["fee"])
     total_fee = base_fee + (wants_shirt_1 * SHIRT_PRICE) + (wants_shirt_2 * SHIRT_PRICE)
 
     db = get_db()
@@ -323,11 +344,12 @@ def admin_logout():
 @app.route("/admin")
 @login_required
 def admin_dashboard():
+    sports = get_sports_config()
     db = get_db()
     ensure_db_schema()
 
     selected_sport = request.args.get("sport", "")
-    if selected_sport and selected_sport in SPORTS:
+    if selected_sport and selected_sport in sports:
         rows = db.execute(
             "SELECT * FROM registrations WHERE sport = ? ORDER BY created_at DESC",
             (selected_sport,),
@@ -377,7 +399,7 @@ def admin_dashboard():
     return render_template(
         "admin_dashboard.html",
         rows=rows,
-        sports=SPORTS,
+        sports=sports,
         selected_sport=selected_sport,
         summary=summary,
         rioni_shirts=rioni_shirts,
@@ -386,6 +408,29 @@ def admin_dashboard():
         closed_message=closed_message,
         auto_close_at=auto_close_at,
     )
+
+
+@app.post("/admin/update-prices")
+@login_required
+def update_prices():
+    for sport_name, config in BASE_SPORTS.items():
+        raw_value = request.form.get(sport_name, "").strip().replace(",", ".")
+        if not raw_value:
+            continue
+        try:
+            value = float(raw_value)
+        except ValueError:
+            flash(f"Prezzo non valido per {sport_name}.", "error")
+            return redirect(url_for("admin_dashboard"))
+
+        if value < 0:
+            flash(f"Il prezzo di {sport_name} non può essere negativo.", "error")
+            return redirect(url_for("admin_dashboard"))
+
+        set_setting(f"sport_price::{sport_name}", str(value))
+
+    flash("Prezzi aggiornati correttamente.", "success")
+    return redirect(url_for("admin_dashboard"))
 
 
 @app.post("/admin/toggle-registrations")
@@ -417,6 +462,7 @@ def set_auto_close():
 @app.route("/admin/edit/<int:registration_id>", methods=["GET", "POST"])
 @login_required
 def edit_registration(registration_id: int):
+    sports = get_sports_config()
     db = get_db()
     ensure_db_schema()
     row = db.execute("SELECT * FROM registrations WHERE id = ?", (registration_id,)).fetchone()
@@ -426,7 +472,7 @@ def edit_registration(registration_id: int):
 
     if request.method == "POST":
         sport_name = request.form.get("sport", "")
-        sport = SPORTS.get(sport_name)
+        sport = sports.get(sport_name)
         if not sport:
             flash("Sport non valido.", "error")
             return redirect(url_for("edit_registration", registration_id=registration_id))
@@ -453,7 +499,7 @@ def edit_registration(registration_id: int):
             wants_shirt_2 = 0
             player2_shirt_size = ""
 
-        total_fee = sport["fee"] + (wants_shirt_1 * SHIRT_PRICE) + (wants_shirt_2 * SHIRT_PRICE)
+        total_fee = float(sport["fee"]) + (wants_shirt_1 * SHIRT_PRICE) + (wants_shirt_2 * SHIRT_PRICE)
 
         db.execute(
             """
@@ -467,7 +513,7 @@ def edit_registration(registration_id: int):
                 request.form.get("email", "").strip(),
                 sport_name,
                 request.form.get("rione", "").strip(),
-                sport["fee"],
+                float(sport["fee"]),
                 total_fee,
                 request.form.get("player1_name", "").strip(),
                 request.form.get("player1_cf", "").strip().upper(),
@@ -493,7 +539,7 @@ def edit_registration(registration_id: int):
     return render_template(
         "edit_registration.html",
         row=row,
-        sports=SPORTS,
+        sports=sports,
         rioni=RIONI,
         belonging_options=BELONGING_OPTIONS,
         shirt_sizes=SHIRT_SIZES,
@@ -553,8 +599,12 @@ def export_players_excel():
     wb.save(output)
     output.seek(0)
     filename = f"anagrafica_giocatori_torneo_rioni_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    return send_file(output, as_attachment=True, download_name=filename,
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @app.route("/admin/export-magliette-rioni")
@@ -604,13 +654,18 @@ def export_rioni_shirts_excel():
     wb.save(output)
     output.seek(0)
     filename = f"magliette_rione_per_rione_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    return send_file(output, as_attachment=True, download_name=filename,
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @app.route("/admin/export")
 @login_required
 def export_excel():
+    sports = get_sports_config()
     db = get_db()
     ensure_db_schema()
     all_rows = db.execute("SELECT * FROM registrations ORDER BY sport, created_at DESC").fetchall()
@@ -628,9 +683,9 @@ def export_excel():
         cell.fill = header_fill
         cell.font = header_font
 
-    sport_groups = {sport: [] for sport in SPORTS.keys()}
+    sport_groups = {sport: [] for sport in sports.keys()}
     for row in all_rows:
-        sport_groups[row["sport"]].append(row)
+        sport_groups.setdefault(row["sport"], []).append(row)
 
     for sport, rows in sport_groups.items():
         total = sum(r["total_fee"] for r in rows)
@@ -671,8 +726,12 @@ def export_excel():
     wb.save(output)
     output.seek(0)
     filename = f"iscrizioni_torneo_rioni_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    return send_file(output, as_attachment=True, download_name=filename,
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @app.route("/health")
@@ -684,14 +743,8 @@ if __name__ == "__main__":
     if not os.path.exists(DATABASE):
         init_db()
     else:
-        # Ensure settings table exists even with old DB
         with app.app_context():
             ensure_db_schema()
 
     port = int(os.environ.get("PORT", 10000))
-
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False
-    )
+    app.run(host="0.0.0.0", port=port, debug=False)
