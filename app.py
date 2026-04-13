@@ -119,46 +119,70 @@ def set_setting(key: str, value: str) -> None:
     db = get_db()
     ensure_db_schema()
     db.execute(
-        "INSERT INTO app_settings(key, value) VALUES(?, ?) "
-        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        "INSERT INTO app_settings(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         (key, value),
     )
     db.commit()
 
 
-def get_sports_config() -> dict[str, dict[str, float | bool]]:
-    sports: dict[str, dict[str, float | bool]] = {}
+def get_sports_config() -> dict[str, dict[str, object]]:
+    sports: dict[str, dict[str, object]] = {}
+
     for sport_name, config in BASE_SPORTS.items():
         stored_price = get_setting(f"sport_price::{sport_name}", "")
-        fee = config["fee"]
+        fee = float(config["fee"])
         if stored_price:
             try:
                 fee = float(stored_price)
             except ValueError:
-                fee = config["fee"]
+                fee = float(config["fee"])
+
+        close_at_raw = get_setting(f"sport_close_at::{sport_name}", "").strip()
+        close_at_value = ""
+        close_at_label = ""
+
+        if close_at_raw:
+            try:
+                dt = datetime.fromisoformat(close_at_raw)
+                close_at_value = dt.isoformat(timespec="minutes")
+                close_at_label = dt.strftime("%d/%m/%Y alle %H:%M")
+            except ValueError:
+                close_at_value = ""
+                close_at_label = ""
 
         sports[sport_name] = {
             "fee": fee,
             "is_double": bool(config["is_double"]),
+            "close_at_value": close_at_value,
+            "close_at_label": close_at_label,
         }
+
     return sports
 
 
-def get_registration_open_status() -> tuple[bool, str]:
+def get_registration_open_status_for_sport(sport_name: str | None) -> tuple[bool, str]:
     manual_closed = get_setting("registrations_closed", "0") == "1"
-    auto_close_at = get_setting("auto_close_at", "").strip()
 
     if manual_closed:
         return False, "Le iscrizioni sono state chiuse dagli organizzatori."
 
-    if auto_close_at:
-        try:
-            close_dt = datetime.fromisoformat(auto_close_at)
-            if datetime.now() >= close_dt:
-                return False, f"Le iscrizioni sono chiuse dal {close_dt.strftime('%d/%m/%Y alle %H:%M')}."
-        except ValueError:
-            pass
+    if sport_name:
+        sport_close_at = get_setting(f"sport_close_at::{sport_name}", "").strip()
+        if sport_close_at:
+            try:
+                close_dt = datetime.fromisoformat(sport_close_at)
+                if datetime.now() >= close_dt:
+                    return False, f"Le iscrizioni per {sport_name} sono chiuse dal {close_dt.strftime('%d/%m/%Y alle %H:%M')}."
+            except ValueError:
+                pass
 
+    return True, ""
+
+
+def get_global_registration_open_status() -> tuple[bool, str]:
+    manual_closed = get_setting("registrations_closed", "0") == "1"
+    if manual_closed:
+        return False, "Le iscrizioni sono state chiuse dagli organizzatori."
     return True, ""
 
 
@@ -180,7 +204,7 @@ def currency_filter(value: float) -> str:
 @app.route("/")
 def index():
     sports = get_sports_config()
-    is_open, closed_message = get_registration_open_status()
+    registrations_open, closed_message = get_global_registration_open_status()
     return render_template(
         "index.html",
         sports=sports,
@@ -189,7 +213,7 @@ def index():
         shirt_price=SHIRT_PRICE,
         shirt_sizes=SHIRT_SIZES,
         map_url=MAP_URL,
-        registrations_open=is_open,
+        registrations_open=registrations_open,
         closed_message=closed_message,
     )
 
@@ -197,16 +221,17 @@ def index():
 @app.post("/submit")
 def submit_registration():
     sports = get_sports_config()
-    is_open, closed_message = get_registration_open_status()
-    if not is_open:
-        flash(closed_message or "Le iscrizioni sono chiuse.", "error")
-        return redirect(url_for("index"))
 
     form = request.form
     sport_name = form.get("sport", "")
     sport = sports.get(sport_name)
     if not sport:
         flash("Seleziona uno sport valido.", "error")
+        return redirect(url_for("index"))
+
+    is_open, closed_message = get_registration_open_status_for_sport(sport_name)
+    if not is_open:
+        flash(closed_message or "Le iscrizioni sono chiuse.", "error")
         return redirect(url_for("index"))
 
     if form.get("confirm_fee") != "Si":
@@ -253,7 +278,7 @@ def submit_registration():
     wants_shirt_2 = 1 if form.get("shirt_player2") == "Si" else 0
     player2_shirt_size = form.get("player2_shirt_size", "").strip()
 
-    if sport["is_double"]:
+    if bool(sport["is_double"]):
         if not all([player2_name, player2_cf, player2_phone, player2_belonging, player2_address]):
             flash("Per questo sport di coppia devi compilare anche i dati del 2° giocatore.", "error")
             return redirect(url_for("index"))
@@ -393,8 +418,7 @@ def admin_dashboard():
         total = sum(merged.values())
         rioni_shirts.append({"rione": rione, "sizes": merged, "total": total})
 
-    is_open, closed_message = get_registration_open_status()
-    auto_close_at = get_setting("auto_close_at", "")
+    registrations_open, closed_message = get_global_registration_open_status()
 
     return render_template(
         "admin_dashboard.html",
@@ -404,33 +428,9 @@ def admin_dashboard():
         summary=summary,
         rioni_shirts=rioni_shirts,
         shirt_sizes=SHIRT_SIZES,
-        registrations_open=is_open,
+        registrations_open=registrations_open,
         closed_message=closed_message,
-        auto_close_at=auto_close_at,
     )
-
-
-@app.post("/admin/update-prices")
-@login_required
-def update_prices():
-    for sport_name, config in BASE_SPORTS.items():
-        raw_value = request.form.get(sport_name, "").strip().replace(",", ".")
-        if not raw_value:
-            continue
-        try:
-            value = float(raw_value)
-        except ValueError:
-            flash(f"Prezzo non valido per {sport_name}.", "error")
-            return redirect(url_for("admin_dashboard"))
-
-        if value < 0:
-            flash(f"Il prezzo di {sport_name} non può essere negativo.", "error")
-            return redirect(url_for("admin_dashboard"))
-
-        set_setting(f"sport_price::{sport_name}", str(value))
-
-    flash("Prezzi aggiornati correttamente.", "success")
-    return redirect(url_for("admin_dashboard"))
 
 
 @app.post("/admin/toggle-registrations")
@@ -442,20 +442,22 @@ def toggle_registrations():
     return redirect(url_for("admin_dashboard"))
 
 
-@app.post("/admin/set-auto-close")
+@app.post("/admin/update-sport-closures")
 @login_required
-def set_auto_close():
-    auto_close_at = request.form.get("auto_close_at", "").strip()
-    if auto_close_at:
-        try:
-            dt = datetime.fromisoformat(auto_close_at)
-            set_setting("auto_close_at", dt.isoformat(timespec="minutes"))
-            flash("Data di chiusura automatica salvata.", "success")
-        except ValueError:
-            flash("Formato data non valido.", "error")
-    else:
-        set_setting("auto_close_at", "")
-        flash("Data di chiusura automatica rimossa.", "success")
+def update_sport_closures():
+    for sport_name in BASE_SPORTS.keys():
+        value = request.form.get(sport_name, "").strip()
+        if value:
+            try:
+                dt = datetime.fromisoformat(value)
+                set_setting(f"sport_close_at::{sport_name}", dt.isoformat(timespec="minutes"))
+            except ValueError:
+                flash(f"Data non valida per {sport_name}.", "error")
+                return redirect(url_for("admin_dashboard"))
+        else:
+            set_setting(f"sport_close_at::{sport_name}", "")
+
+    flash("Date di chiusura per sport aggiornate correttamente.", "success")
     return redirect(url_for("admin_dashboard"))
 
 
@@ -494,7 +496,7 @@ def edit_registration(registration_id: int):
         player2_phone = request.form.get("player2_phone", "").strip()
         player2_belonging = request.form.get("player2_belonging", "").strip()
         player2_address = request.form.get("player2_address", "").strip()
-        if not sport["is_double"]:
+        if not bool(sport["is_double"]):
             player2_name = player2_cf = player2_phone = player2_belonging = player2_address = ""
             wants_shirt_2 = 0
             player2_shirt_size = ""
@@ -599,12 +601,8 @@ def export_players_excel():
     wb.save(output)
     output.seek(0)
     filename = f"anagrafica_giocatori_torneo_rioni_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name=filename,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+    return send_file(output, as_attachment=True, download_name=filename,
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @app.route("/admin/export-magliette-rioni")
@@ -654,12 +652,8 @@ def export_rioni_shirts_excel():
     wb.save(output)
     output.seek(0)
     filename = f"magliette_rione_per_rione_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name=filename,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+    return send_file(output, as_attachment=True, download_name=filename,
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @app.route("/admin/export")
@@ -685,7 +679,7 @@ def export_excel():
 
     sport_groups = {sport: [] for sport in sports.keys()}
     for row in all_rows:
-        sport_groups.setdefault(row["sport"], []).append(row)
+        sport_groups[row["sport"]].append(row)
 
     for sport, rows in sport_groups.items():
         total = sum(r["total_fee"] for r in rows)
@@ -726,12 +720,8 @@ def export_excel():
     wb.save(output)
     output.seek(0)
     filename = f"iscrizioni_torneo_rioni_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name=filename,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+    return send_file(output, as_attachment=True, download_name=filename,
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @app.route("/health")
