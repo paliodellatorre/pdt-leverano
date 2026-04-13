@@ -23,6 +23,28 @@
     </div>
 </section>
 
+<section class="section-card">
+    <h2>Prezzi sport</h2>
+    <form method="post" action="{{ url_for('update_prices') }}">
+        <div class="grid two">
+            {% for sport_name, sport_data in sports.items() %}
+                <div class="field">
+                    <label>{{ sport_name }}</label>
+                    <input
+                        type="text"
+                        name="{{ sport_name }}"
+                        value="{{ '%.2f'|format(sport_data.fee) }}"
+                        required
+                    >
+                </div>
+            {% endfor %}
+        </div>
+        <div class="inline-buttons" style="margin-top: 16px;">
+            <button class="submit-btn" type="submit">Salva prezzi</button>
+        </div>
+    </form>
+</section>
+
 <section class="section-card controls-card">
     <div class="controls-grid">
         <form method="post" action="{{ url_for('toggle_registrations') }}">
