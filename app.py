@@ -119,7 +119,8 @@ def set_setting(key: str, value: str) -> None:
     db = get_db()
     ensure_db_schema()
     db.execute(
-        "INSERT INTO app_settings(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        "INSERT INTO app_settings(key, value) VALUES(?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         (key, value),
     )
     db.commit()
