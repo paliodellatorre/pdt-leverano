@@ -1,74 +1,192 @@
 {% extends "base.html" %}
-
+{% block title %}Dashboard Admin{% endblock %}
 {% block content %}
-
-<h2>Gestione iscrizioni per sport</h2>
-
-<table>
-
-    <tr>
-        <th>Sport</th>
-        <th>Stato</th>
-        <th>Azione</th>
-    </tr>
-
-    {% for sport in sports %}
-
-    <tr>
-
-        <td>
-            {{ sport }}
-        </td>
-
-        <td>
-
-            {% if sports_status[sport] %}
-
-                APERTO
-
+<section class="dashboard-head">
+    <div>
+        <div class="badge">Admin</div>
+        <h1>Dashboard iscrizioni</h1>
+        <p class="status-line">
+            Stato iscrizioni:
+            {% if registrations_open %}
+                <strong class="text-success">APERTE</strong>
             {% else %}
-
-                CHIUSO
-
+                <strong class="text-danger">CHIUSE</strong>
             {% endif %}
+            {% if closed_message %}<span>— {{ closed_message }}</span>{% endif %}
+        </p>
+    </div>
+    <div class="dashboard-actions">
+        <a class="ghost-btn" href="{{ url_for('export_excel') }}">Scarica Excel</a>
+        <a class="ghost-btn" href="{{ url_for('export_players_excel') }}">Excel anagrafica giocatori</a>
+        <a class="ghost-btn" href="{{ url_for('export_rioni_shirts_excel') }}">Excel magliette per rione</a>
+        <a class="ghost-btn" href="{{ url_for('admin_logout') }}">Esci</a>
+    </div>
+</section>
 
-        </td>
+<section class="section-card">
+    <h2>Prezzi sport</h2>
+    <form method="post" action="{{ url_for('update_prices') }}">
+        <div class="grid two">
+            {% for sport_name, sport_data in sports.items() %}
+                <div class="field">
+                    <label>{{ sport_name }}</label>
+                    <input
+                        type="text"
+                        name="{{ sport_name }}"
+                        value="{{ '%.2f'|format(sport_data.fee) }}"
+                        required
+                    >
+                </div>
+            {% endfor %}
+        </div>
+        <div class="inline-buttons" style="margin-top: 16px;">
+            <button class="submit-btn" type="submit">Salva prezzi</button>
+        </div>
+    </form>
+</section>
 
-        <td>
+<section class="section-card">
+    <h2>Chiusura iscrizioni per sport</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Sport</th>
+                    <th>Stato</th>
+                    <th>Azione</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sport_name, sport_data in sports.items() %}
+                    <tr>
+                        <td>{{ sport_name }}</td>
+                        <td>
+                            {% if sport_data.is_open %}
+                                <strong class="text-success">APERTO</strong>
+                            {% else %}
+                                <strong class="text-danger">CHIUSO</strong>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form method="post" action="{{ url_for('toggle_sport', sport_name=sport_name) }}">
+                                {% if sport_data.is_open %}
+                                    <button class="ghost-btn small-btn danger-outline" type="submit">Chiudi</button>
+                                {% else %}
+                                    <button class="ghost-btn small-btn" type="submit">Riapri</button>
+                                {% endif %}
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
 
-            <form
-                method="post"
-                action="{{ url_for('toggle_sport', sport_name=sport) }}"
-            >
+<section class="section-card controls-card">
+    <div class="controls-grid">
+        <form method="post" action="{{ url_for('toggle_registrations') }}">
+            <button class="submit-btn danger-btn" type="submit">
+                {% if registrations_open %}Chiudi tutte le iscrizioni{% else %}Riapri tutte le iscrizioni{% endif %}
+            </button>
+        </form>
+    </div>
+</section>
 
-                {% if sports_status[sport] %}
-
-                    <button>
-                        Chiudi
-                    </button>
-
-                {% else %}
-
-                    <button>
-                        Riapri
-                    </button>
-
-                {% endif %}
-
-            </form>
-
-        </td>
-
-    </tr>
-
+<section class="summary-grid">
+    {% for item in summary %}
+        <div class="summary-card">
+            <h3>{{ item['sport'] }}</h3>
+            <p>Iscrizioni: <strong>{{ item['registrations_count'] }}</strong></p>
+            <p>Incassi: <strong>{{ item['total_collected']|default(0, true)|currency }}</strong></p>
+            <p>Maglie: <strong>{{ item['shirts_count'] or 0 }}</strong></p>
+        </div>
     {% endfor %}
+</section>
 
-</table>
+<section class="table-card">
+    <h2>Conteggio magliette rione per rione</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Rione</th>
+                    {% for size in shirt_sizes %}
+                        <th>{{ size }}</th>
+                    {% endfor %}
+                    <th>Totale</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in rioni_shirts %}
+                    <tr>
+                        <td>{{ item.rione }}</td>
+                        {% for size in shirt_sizes %}
+                            <td>{{ item.sizes[size] }}</td>
+                        {% endfor %}
+                        <td><strong>{{ item.total }}</strong></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="{{ shirt_sizes|length + 2 }}">Nessun dato disponibile.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
 
-<br>
+<section class="table-card">
+    <form method="get" class="filter-row">
+        <select name="sport">
+            <option value="">Tutti gli sport</option>
+            {% for sport_name in sports.keys() %}
+                <option value="{{ sport_name }}" {% if selected_sport == sport_name %}selected{% endif %}>{{ sport_name }}</option>
+            {% endfor %}
+        </select>
+        <button class="ghost-btn" type="submit">Filtra</button>
+    </form>
 
-<a href="/admin/logout">
-    Logout
-</a>
-
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Sport</th>
+                    <th>Rione</th>
+                    <th>1° giocatore</th>
+                    <th>Taglia 1</th>
+                    <th>2° giocatore</th>
+                    <th>Taglia 2</th>
+                    <th>Email</th>
+                    <th>Totale</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row['created_at'] }}</td>
+                        <td>{{ row['sport'] }}</td>
+                        <td>{{ row['rione'] }}</td>
+                        <td>{{ row['player1_name'] }}</td>
+                        <td>{{ row['player1_shirt_size'] or '-' }}</td>
+                        <td>{{ row['player2_name'] or '-' }}</td>
+                        <td>{{ row['player2_shirt_size'] or '-' }}</td>
+                        <td>{{ row['email'] }}</td>
+                        <td>{{ row['total_fee']|currency }}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <a class="ghost-btn small-btn" href="{{ url_for('edit_registration', registration_id=row['id']) }}">Modifica</a>
+                                <form method="post" action="{{ url_for('delete_registration', registration_id=row['id']) }}" onsubmit="return confirm('Eliminare questa iscrizione?');">
+                                    <button class="ghost-btn small-btn danger-outline" type="submit">Elimina</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="10">Nessuna iscrizione trovata.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
 {% endblock %}
