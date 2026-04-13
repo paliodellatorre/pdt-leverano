@@ -688,13 +688,6 @@ if __name__ == "__main__":
         # Ensure settings table exists even with old DB
         with app.app_context():
             ensure_db_schema()
-    if __name__ == "__main__":
-    if not os.path.exists(DATABASE):
-        init_db()
-    else:
-        # Ensure settings table exists even with old DB
-        with app.app_context():
-            ensure_db_schema()
 
     port = int(os.environ.get("PORT", 10000))
 
