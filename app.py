@@ -37,10 +37,9 @@ RIONI = [
     "ZITA ROSA",
     "CENTRO",
     "CONSOLAZIONE",
-    "PATULA",
-    "CUPA QUARTARARU",
-]
-
+    "PATULA - CUPA QUARTARARU",
+    ]
+    
 SPORTS = {
     "Calcio": {"fee": 10.0, "is_double": False},
     "Padel": {"fee": 40.0, "is_double": True},
