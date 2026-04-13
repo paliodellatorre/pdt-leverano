@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Iscrizione inviata{% endblock %}
+{% block content %}
+<section class="section-card success-card">
+    <h1>Iscrizione inviata correttamente</h1>
+    <p><strong>Sport:</strong> {{ sport_name }}</p>
+    <p><strong>Rione:</strong> {{ rione }}</p>
+    <p><strong>Totale da consegnare:</strong> {{ total_fee|currency }}</p>
+    <p><strong>Email registrata:</strong> {{ email }}</p>
+    <a class="ghost-btn" href="{{ url_for('index') }}">Torna alla home</a>
+</section>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Modifica iscrizione{% endblock %}
+{% block content %}
+<section class="section-card">
+    <h1>Modifica iscrizione</h1>
+    <form method="post" class="form-card">
+        <div class="grid two">
+            <div class="field">
+                <label>Email</label>
+                <input type="email" name="email" value="{{ row['email'] }}" required>
+            </div>
+            <div class="field">
+                <label>Rione</label>
+                <select name="rione" required>
+                    {% for rione in rioni %}
+                        <option value="{{ rione }}" {% if row['rione'] == rione %}selected{% endif %}>{{ rione }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field full">
+                <label>Sport</label>
+                <select name="sport" id="sport" onchange="toggleDoubleFields()" required>
+                    {% for sport_name, sport_data in sports.items() %}
+                        <option value="{{ sport_name }}" data-double="{{ 1 if sport_data.is_double else 0 }}" {% if row['sport'] == sport_name %}selected{% endif %}>{{ sport_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <section class="section-card">
+            <h2>1° giocatore</h2>
+            <div class="grid two">
+                <div class="field"><label>Nome</label><input name="player1_name" value="{{ row['player1_name'] }}" required></div>
+                <div class="field"><label>Codice fiscale</label><input name="player1_cf" value="{{ row['player1_cf'] }}" required></div>
+                <div class="field"><label>Telefono</label><input name="player1_phone" value="{{ row['player1_phone'] }}" required></div>
+                <div class="field">
+                    <label>Criterio rione</label>
+                    <select name="player1_belonging" required>
+                        {% for option in belonging_options %}
+                            <option value="{{ option }}" {% if row['player1_belonging'] == option %}selected{% endif %}>{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field full"><label>Indirizzo</label><input name="player1_address" value="{{ row['player1_address'] }}" required></div>
+                <div class="field">
+                    <label>Maglia 1</label>
+                    <select name="player1_shirt" onchange="toggleShirtSize('1')">
+                        <option value="No" {% if not row['player1_shirt'] %}selected{% endif %}>No</option>
+                        <option value="Si" {% if row['player1_shirt'] %}selected{% endif %}>Si</option>
+                    </select>
+                </div>
+                <div class="field" id="player1_shirt_size_wrap">
+                    <label>Taglia 1</label>
+                    <select name="player1_shirt_size" id="player1_shirt_size">
+                        <option value="">Seleziona</option>
+                        {% for size in shirt_sizes %}
+                            <option value="{{ size }}" {% if row['player1_shirt_size'] == size %}selected{% endif %}>{{ size }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <section id="double-fields" class="section-card">
+            <h2>2° giocatore</h2>
+            <div class="grid two">
+                <div class="field"><label>Nome</label><input name="player2_name" id="player2_name" value="{{ row['player2_name'] or '' }}"></div>
+                <div class="field"><label>Codice fiscale</label><input name="player2_cf" id="player2_cf" value="{{ row['player2_cf'] or '' }}"></div>
+                <div class="field"><label>Telefono</label><input name="player2_phone" id="player2_phone" value="{{ row['player2_phone'] or '' }}"></div>
+                <div class="field">
+                    <label>Criterio rione</label>
+                    <select name="player2_belonging" id="player2_belonging">
+                        <option value="">Seleziona</option>
+                        {% for option in belonging_options %}
+                            <option value="{{ option }}" {% if row['player2_belonging'] == option %}selected{% endif %}>{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field full"><label>Indirizzo</label><input name="player2_address" id="player2_address" value="{{ row['player2_address'] or '' }}"></div>
+                <div class="field">
+                    <label>Maglia 2</label>
+                    <select name="player2_shirt" onchange="toggleShirtSize('2')">
+                        <option value="No" {% if not row['player2_shirt'] %}selected{% endif %}>No</option>
+                        <option value="Si" {% if row['player2_shirt'] %}selected{% endif %}>Si</option>
+                    </select>
+                </div>
+                <div class="field" id="player2_shirt_size_wrap">
+                    <label>Taglia 2</label>
+                    <select name="player2_shirt_size" id="player2_shirt_size">
+                        <option value="">Seleziona</option>
+                        {% for size in shirt_sizes %}
+                            <option value="{{ size }}" {% if row['player2_shirt_size'] == size %}selected{% endif %}>{{ size }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <div class="inline-buttons">
+            <button class="submit-btn" type="submit">Salva modifiche</button>
+            <a class="ghost-btn" href="{{ url_for('admin_dashboard') }}">Annulla</a>
+        </div>
+    </form>
+</section>
+
+<script>
+function toggleDoubleFields() {
+    const sportSelect = document.getElementById("sport");
+    const selected = sportSelect.options[sportSelect.selectedIndex];
+    const isDouble = selected && selected.dataset.double === "1";
+    const section = document.getElementById("double-fields");
+    if (isDouble) {
+        section.classList.remove("hidden");
+    } else {
+        section.classList.add("hidden");
+        ["player2_name","player2_cf","player2_phone","player2_belonging","player2_address","player2_shirt_size"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = "";
+        });
+    }
+}
+function toggleShirtSize(player) {
+    const selectMaglia = document.querySelector(`select[name="player${player}_shirt"]`);
+    const wrap = document.getElementById(`player${player}_shirt_size_wrap`);
+    const select = document.getElementById(`player${player}_shirt_size`);
+    if (selectMaglia && selectMaglia.value === "Si") {
+        wrap.classList.remove("hidden");
+    } else {
+        wrap.classList.add("hidden");
+        select.value = "";
+    }
+}
+toggleDoubleFields();
+toggleShirtSize('1');
+toggleShirtSize('2');
+</script>
+{% endblock %}
