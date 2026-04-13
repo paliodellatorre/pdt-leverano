@@ -24,23 +24,27 @@
 </section>
 
 <section class="section-card">
-    <h2>Prezzi sport</h2>
-    <form method="post" action="{{ url_for('update_prices') }}">
+    <h2>Chiusura iscrizioni per sport</h2>
+    <form method="post" action="{{ url_for('update_sport_closures') }}">
         <div class="grid two">
             {% for sport_name, sport_data in sports.items() %}
                 <div class="field">
                     <label>{{ sport_name }}</label>
                     <input
-                        type="text"
+                        type="datetime-local"
                         name="{{ sport_name }}"
-                        value="{{ '%.2f'|format(sport_data.fee) }}"
-                        required
+                        value="{{ sport_data.close_at_value }}"
                     >
+                    {% if sport_data.close_at_label %}
+                        <small>Attuale: {{ sport_data.close_at_label }}</small>
+                    {% else %}
+                        <small>Nessuna chiusura impostata</small>
+                    {% endif %}
                 </div>
             {% endfor %}
         </div>
         <div class="inline-buttons" style="margin-top: 16px;">
-            <button class="submit-btn" type="submit">Salva prezzi</button>
+            <button class="submit-btn" type="submit">Salva chiusure sport</button>
         </div>
     </form>
 </section>
@@ -49,16 +53,8 @@
     <div class="controls-grid">
         <form method="post" action="{{ url_for('toggle_registrations') }}">
             <button class="submit-btn danger-btn" type="submit">
-                {% if registrations_open %}Chiudi iscrizioni{% else %}Riapri iscrizioni{% endif %}
+                {% if registrations_open %}Chiudi tutte le iscrizioni{% else %}Riapri tutte le iscrizioni{% endif %}
             </button>
-        </form>
-
-        <form method="post" action="{{ url_for('set_auto_close') }}" class="auto-close-form">
-            <label>Data chiusura automatica</label>
-            <input type="datetime-local" name="auto_close_at" value="{{ auto_close_at }}">
-            <div class="inline-buttons">
-                <button class="ghost-btn" type="submit">Salva data</button>
-            </div>
         </form>
     </div>
 </section>
