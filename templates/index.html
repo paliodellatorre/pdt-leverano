@@ -21,7 +21,7 @@
                 <option value="">Seleziona uno sport</option>
                 {% for sport_name, sport_data in sports.items() %}
                     <option value="{{ sport_name }}" data-fee="{{ sport_data.fee }}" data-double="{{ 1 if sport_data.is_double else 0 }}">
-                        {{ sport_name }} — {{ sport_data.fee|currency }}{% if sport_data.is_double %} a coppia{% endif %}
+                        {{ sport_name }} — € {{ sport_data.fee }}{% if sport_data.is_double %} a coppia{% endif %}
                     </option>
                 {% endfor %}
             </select>
