@@ -465,3 +465,31 @@ th {
         font-size: 15px;
     }
 }
+
+/* LOGO GRANDE SU PC E TELEFONO */
+.logo-wrap {
+    width: min(1120px, calc(100% - 32px));
+    margin: 0 auto;
+    padding-top: 10px;
+}
+
+.top-logo {
+    display: block;
+    width: 100%;
+    max-width: 1120px;
+    height: auto;
+    margin: 0 auto 10px auto;
+    object-fit: contain;
+}
+
+@media (max-width: 768px) {
+    .logo-wrap {
+        width: calc(100% - 20px);
+    }
+
+    .top-logo {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+    }
+}
