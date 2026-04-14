@@ -51,6 +51,7 @@ BASE_SPORTS = {
     "Scacchi": {"fee": 10.0, "is_double": False},
     "1vs1": {"fee": 5.0, "is_double": False},
     "Tennis": {"fee": 10.0, "is_double": False},
+    "Ping Pong": {"fee": 5.0, "is_double": False},
     "Ludopoli": {"fee": 5.0, "is_double": False},
 }
 
