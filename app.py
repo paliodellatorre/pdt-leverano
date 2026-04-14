@@ -22,10 +22,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
-os.makedirs("/data", exist_ok=True)
-
-DATABASE = "/data/database.db"
+DATABASE = os.path.join(BASE_DIR, "database.db")
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "cambia-questa-chiave")
