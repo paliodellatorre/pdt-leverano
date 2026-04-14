@@ -62,11 +62,17 @@ strong {
 
 .top-logo {
     display: block;
-    margin: 0 auto;
-    width: min(90vw, 360px);
+    margin: 0 auto 10px;
+    width: 100%;
     max-width: 100%;
     height: auto;
     object-fit: contain;
+}
+
+.logo-wrap {
+    width: min(1120px, calc(100% - 32px));
+    margin: 0 auto;
+    padding-top: 10px;
 }
 
 /* CARD */
