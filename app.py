@@ -734,7 +734,7 @@ def export_excel():
 def health():
     return {"status": "ok"}
 
-
+start_backup_thread()
 if __name__ == "__main__":
     if not os.path.exists(DATABASE):
         init_db()
@@ -744,3 +744,45 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False)
+
+import threading
+import time
+import shutil
+from datetime import datetime
+import os
+
+def auto_backup_database():
+
+    while True:
+
+        try:
+
+            if os.path.exists("database.db"):
+
+                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+
+                backup_name = f"backup_{timestamp}.db"
+
+                shutil.copy(
+                    "database.db",
+                    backup_name
+                )
+
+                print("Backup creato:", backup_name)
+
+        except Exception as e:
+
+            print("Errore backup:", e)
+
+        # ogni ora
+        time.sleep(3600)
+
+
+def start_backup_thread():
+
+    thread = threading.Thread(
+        target=auto_backup_database,
+        daemon=True
+    )
+
+    thread.start()
