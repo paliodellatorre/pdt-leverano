@@ -7,6 +7,7 @@ from datetime import datetime
 from io import BytesIO
 from functools import wraps
 
+import requests
 from flask import (
     Flask,
     flash,
@@ -23,6 +24,8 @@ from openpyxl.styles import Font, PatternFill
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATABASE = os.path.join(BASE_DIR, "database.db")
+
+GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbG99dWJHCxWYSjOqu1HCMzNQuP5tz39gSjJKy55jqoCTE01xPAs7qigx6OgRkpkDhEg/exec"
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "cambia-questa-chiave")
@@ -51,8 +54,8 @@ BASE_SPORTS = {
     "Scacchi": {"fee": 10.0, "is_double": False},
     "1vs1": {"fee": 5.0, "is_double": False},
     "Tennis": {"fee": 10.0, "is_double": False},
-    "Ping Pong": {"fee": 5.0, "is_double": False},
     "Ludopoli": {"fee": 5.0, "is_double": False},
+    "Ping Pong": {"fee": 5.0, "is_double": False},
 }
 
 BELONGING_OPTIONS = [
@@ -183,6 +186,18 @@ def login_required(view_func):
 @app.template_filter("currency")
 def currency_filter(value: float) -> str:
     return f"€ {float(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def send_registration_to_google_sheets(payload: dict) -> None:
+    try:
+        response = requests.post(
+            GOOGLE_SCRIPT_URL,
+            json=payload,
+            timeout=15,
+        )
+        print("Google Sheets status:", response.status_code, response.text)
+    except Exception as exc:
+        print("Errore invio Google Sheets:", exc)
 
 
 @app.route("/")
@@ -322,6 +337,31 @@ def submit_registration():
         ),
     )
     db.commit()
+
+    payload = {
+        "email": email,
+        "sport": sport_name,
+        "rione": rione,
+        "base_fee": base_fee,
+        "shirt_price": SHIRT_PRICE,
+        "total_fee": total_fee,
+        "player1_name": player1_name,
+        "player1_cf": player1_cf,
+        "player1_phone": player1_phone,
+        "player1_belonging": player1_belonging,
+        "player1_address": player1_address,
+        "player1_shirt": "Si" if wants_shirt_1 else "No",
+        "player1_shirt_size": player1_shirt_size,
+        "player2_name": player2_name,
+        "player2_cf": player2_cf,
+        "player2_phone": player2_phone,
+        "player2_belonging": player2_belonging,
+        "player2_address": player2_address,
+        "player2_shirt": "Si" if wants_shirt_2 else "No",
+        "player2_shirt_size": player2_shirt_size,
+    }
+
+    send_registration_to_google_sheets(payload)
 
     return render_template(
         "success.html",
@@ -607,8 +647,12 @@ def export_players_excel():
     wb.save(output)
     output.seek(0)
     filename = f"anagrafica_giocatori_torneo_rioni_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    return send_file(output, as_attachment=True, download_name=filename,
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @app.route("/admin/export-magliette-rioni")
@@ -658,8 +702,12 @@ def export_rioni_shirts_excel():
     wb.save(output)
     output.seek(0)
     filename = f"magliette_rione_per_rione_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    return send_file(output, as_attachment=True, download_name=filename,
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @app.route("/admin/export")
@@ -726,15 +774,19 @@ def export_excel():
     wb.save(output)
     output.seek(0)
     filename = f"iscrizioni_torneo_rioni_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    return send_file(output, as_attachment=True, download_name=filename,
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @app.route("/health")
 def health():
     return {"status": "ok"}
 
-start_backup_thread()
+
 if __name__ == "__main__":
     if not os.path.exists(DATABASE):
         init_db()
@@ -744,45 +796,3 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False)
-
-import threading
-import time
-import shutil
-from datetime import datetime
-import os
-
-def auto_backup_database():
-
-    while True:
-
-        try:
-
-            if os.path.exists("database.db"):
-
-                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-
-                backup_name = f"backup_{timestamp}.db"
-
-                shutil.copy(
-                    "database.db",
-                    backup_name
-                )
-
-                print("Backup creato:", backup_name)
-
-        except Exception as e:
-
-            print("Errore backup:", e)
-
-        # ogni ora
-        time.sleep(3600)
-
-
-def start_backup_thread():
-
-    thread = threading.Thread(
-        target=auto_backup_database,
-        daemon=True
-    )
-
-    thread.start()
