@@ -1,230 +1,265 @@
-<!DOCTYPE html>
+{% extends "base.html" %}
+{% block title %}ISCRIZIONI SPORT - PALIO DELLA TORRE LEVERANO{% endblock %}
+{% block content %}
+<section class="hero-card">
+    <div class="badge">Palio della Torre Leverano</div>
+    <h1>ISCRIZIONI SPORT</h1>
+    <p>Compila il modulo dal tuo smartphone. Per gli sport di coppia devi inserire anche il compagno dello stesso rione.</p>
+</section>
 
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <title>Iscrizioni Sport - Palio della Torre Leverano</title>
+{% if not registrations_open %}
+<section class="section-card closed-box">
+    <h2>Iscrizioni chiuse</h2>
+    <p>{{ closed_message }}</p>
+</section>
+{% else %}
+<form class="form-card" method="post" action="{{ url_for('submit_registration') }}">
+    <div class="grid two">
+        <div class="field full">
+            <label for="sport">Sport *</label>
+            <select id="sport" name="sport" required onchange="toggleDoubleFields(); updateFeeText();">
+                <option value="">Seleziona uno sport</option>
+                {% for sport_name, sport_data in sports.items() %}
+                    {% if sport_data.is_open %}
+                        <option value="{{ sport_name }}" data-fee="{{ sport_data.fee }}" data-double="{{ 1 if sport_data.is_double else 0 }}">
+                            {{ sport_name }} — € {{ sport_data.fee }}{% if sport_data.is_double %} a coppia{% endif %}
+                        </option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </div>
 
-```
-<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+        <div class="field">
+            <label for="email">Email *</label>
+            <input id="email" name="email" type="email" required placeholder="nome@email.it">
+            <small>La email verrà registrata insieme all'iscrizione.</small>
+        </div>
 
-<style>
-    body {
-        background-color: #003129;
-        color: #FCBD16;
-        font-family: Arial, Helvetica, sans-serif;
-    }
+        <div class="field">
+            <label for="rione">Rione *</label>
+            <select id="rione" name="rione" required>
+                <option value="">Scegli il tuo rione</option>
+                {% for rione in rioni %}
+                    <option value="{{ rione }}">{{ rione }}</option>
+                {% endfor %}
+            </select>
+            <small><a href="{{ map_url }}" target="_blank" rel="noopener">Consulta la mappa dei rioni</a></small>
+        </div>
+    </div>
 
-    .container {
-        max-width: 1000px;
-        margin: 0 auto;
-        padding: 20px;
-    }
-
-    h1, h2 {
-        text-align: center;
-        margin-bottom: 20px;
-    }
-
-    .card {
-        border: 1px solid #FCBD16;
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 25px;
-    }
-
-    input, select {
-        width: 100%;
-        padding: 10px;
-        border-radius: 8px;
-        border: 1px solid #FCBD16;
-        background-color: #003129;
-        color: #FCBD16;
-        margin-top: 6px;
-    }
-
-    .row {
-        display: flex;
-        gap: 15px;
-        flex-wrap: wrap;
-    }
-
-    .col {
-        flex: 1;
-        min-width: 220px;
-    }
-
-    button {
-        background-color: #FCBD16;
-        color: #003129;
-        border: none;
-        padding: 12px 20px;
-        border-radius: 10px;
-        font-weight: bold;
-        cursor: pointer;
-        margin-top: 20px;
-        width: 100%;
-    }
-
-    button:hover {
-        opacity: 0.9;
-    }
-
-    /* RADIO INLINE */
-
-    .radio-group {
-        display: flex;
-        gap: 25px;
-        align-items: center;
-        margin-top: 10px;
-    }
-
-    .radio-group label {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        cursor: pointer;
-    }
-
-    .radio-group input[type="radio"] {
-        transform: scale(1.2);
-    }
-
-</style>
-```
-
-</head>
-
-<body>
-
-<div class="container">
-
-```
-<div style="text-align:center; margin-bottom:20px;">
-    <img src="{{ url_for('static', filename='logo.svg') }}" alt="Logo" style="max-height:120px;">
-</div>
-
-<h1>ISCRIZIONI SPORT</h1>
-
-<form method="POST">
-
-    <div class="card">
+    <section class="section-card">
         <h2>Conferma quota</h2>
-
-        <label>
-            Confermo di aver compreso che l'iscrizione ha un costo da consegnare agli organizzatori prima dell'inizio del torneo.
-            La maglia del proprio rione può essere acquistata a parte a € 5.
-        </label>
+        <p id="fee-text">Confermo di aver compreso che l'iscrizione ha un costo di ___ da consegnare agli organizzatori prima dell'inizio del torneo. La maglia del proprio rione può essere acquistata a parte a € 5.</p>
 
         <div class="radio-group">
             <label>
-                <input type="radio" name="conferma_quota" value="Si" required>
+                <input type="radio" name="confirm_fee" value="Si" required>
                 Sì
             </label>
-
             <label>
-                <input type="radio" name="conferma_quota" value="No">
+                <input type="radio" name="confirm_fee" value="No" required>
                 No
             </label>
         </div>
+    </section>
 
-    </div>
-
-    <div class="card">
-
+    <section class="section-card">
         <h2>1° giocatore</h2>
-
-        <div class="row">
-
-            <div class="col">
-                <label>Nome e Cognome *</label>
-                <input type="text" name="nome1" required>
+        <div class="grid two">
+            <div class="field">
+                <label>Nome e Cognome 1° giocatore *</label>
+                <input name="player1_name" required>
             </div>
 
-            <div class="col">
-                <label>Codice fiscale *</label>
-                <input type="text" name="cf1" required>
+            <div class="field">
+                <label>Codice fiscale 1° giocatore *</label>
+                <input name="player1_cf" required>
             </div>
 
-            <div class="col">
-                <label>Telefono *</label>
-                <input type="text" name="telefono1" required>
+            <div class="field">
+                <label>Numero di telefono 1° giocatore *</label>
+                <input name="player1_phone" required>
             </div>
 
-            <div class="col">
-                <label>Rione *</label>
-                <select name="rione1" required>
+            <div class="field">
+                <label>Criterio di appartenenza al Rione *</label>
+                <select name="player1_belonging" required>
                     <option value="">Seleziona</option>
-                    {% for rione in rioni %}
-                    <option value="{{ rione }}">{{ rione }}</option>
+                    {% for option in belonging_options %}
+                        <option value="{{ option }}">{{ option }}</option>
                     {% endfor %}
                 </select>
             </div>
 
+            <div class="field full">
+                <label>Indirizzo di appartenenza al Rione 1° giocatore *</label>
+                <input name="player1_address" required>
+            </div>
+
+            <div class="field full toggle-inline">
+                <label>Vuoi acquistare la maglia del rione per il 1° giocatore? (+ € 5)</label>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="shirt_player1" value="Si" required onchange="toggleShirtSize('1')">
+                        Sì
+                    </label>
+                    <label>
+                        <input type="radio" name="shirt_player1" value="No" required checked onchange="toggleShirtSize('1')">
+                        No
+                    </label>
+                </div>
+            </div>
+
+            <div class="field full hidden" id="player1_shirt_size_wrap">
+                <label>Taglia maglietta 1° giocatore *</label>
+                <select name="player1_shirt_size" id="player1_shirt_size">
+                    <option value="">Seleziona taglia</option>
+                    {% for size in shirt_sizes %}
+                        <option value="{{ size }}">{{ size }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
+    </section>
 
-        <br>
+    <section id="double-fields" class="section-card hidden">
+        <h2>2° giocatore</h2>
+        <p class="highlight">Per gli sport di coppia il compagno deve appartenere allo stesso rione indicato sopra.</p>
 
-        <label>Vuoi acquistare la maglia del rione per il 1° giocatore? (+ € 5)</label>
+        <div class="grid two">
+            <div class="field">
+                <label>Nome e Cognome 2° giocatore *</label>
+                <input name="player2_name" id="player2_name">
+            </div>
 
-        <div class="radio-group">
-            <label>
-                <input type="radio" name="maglia1" value="Si">
-                Sì
-            </label>
+            <div class="field">
+                <label>Codice fiscale 2° giocatore *</label>
+                <input name="player2_cf" id="player2_cf">
+            </div>
 
-            <label>
-                <input type="radio" name="maglia1" value="No">
-                No
-            </label>
+            <div class="field">
+                <label>Numero di telefono 2° giocatore *</label>
+                <input name="player2_phone" id="player2_phone">
+            </div>
+
+            <div class="field">
+                <label>Criterio di appartenenza al Rione (2° giocatore) *</label>
+                <select name="player2_belonging" id="player2_belonging">
+                    <option value="">Seleziona</option>
+                    {% for option in belonging_options %}
+                        <option value="{{ option }}">{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field full">
+                <label>Indirizzo di appartenenza al Rione 2° giocatore *</label>
+                <input name="player2_address" id="player2_address">
+            </div>
+
+            <div class="field full">
+                <label>Vuoi acquistare la maglia del rione per il 2° giocatore? (+ € 5)</label>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="shirt_player2" value="Si" onchange="toggleShirtSize('2')">
+                        Sì
+                    </label>
+                    <label>
+                        <input type="radio" name="shirt_player2" value="No" checked onchange="toggleShirtSize('2')">
+                        No
+                    </label>
+                </div>
+            </div>
+
+            <div class="field full hidden" id="player2_shirt_size_wrap">
+                <label>Taglia maglietta 2° giocatore *</label>
+                <select name="player2_shirt_size" id="player2_shirt_size">
+                    <option value="">Seleziona taglia</option>
+                    {% for size in shirt_sizes %}
+                        <option value="{{ size }}">{{ size }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
+    </section>
 
-    </div>
+    <section class="section-card">
+        <h2>Conferme obbligatorie</h2>
+        <div class="checks">
+            <label><input type="checkbox" name="confirm_rione_check" value="Si" required> Confermo di aver compreso che l'appartenenza al Rione verrà verificata pena l'esclusione da tutte le attività del Torneo dei Rioni.</label>
 
-    <div class="card">
+            <label><input type="checkbox" name="confirm_approval" value="Si" required> Confermo di aver compreso che l'iscrizione dovrà essere confermata dagli organizzatori.</label>
 
-        <h2>Consensi</h2>
+            <label><input type="checkbox" name="privacy_ok" value="Si" required> Autorizzo il trattamento dei dati personali nel rispetto del Regolamento Europeo 2016/679 e normativa vigente.</label>
 
-        <label>Accetto il trattamento dei dati personali</label>
+            <label><input type="checkbox" name="images_ok" value="Si" required> Autorizzo la pubblicazione e/o diffusione gratuita delle immagini sui canali social del Palio della Torre e associazioni collegate.</label>
 
-        <div class="radio-group">
-            <label>
-                <input type="radio" name="privacy" value="Si" required>
-                Sì
-            </label>
-
-            <label>
-                <input type="radio" name="privacy" value="No">
-                No
-            </label>
+            <label><input type="checkbox" name="liability_ok" value="Si" required> I partecipanti si assumono ogni responsabilità per l'attività sportiva e sollevano gli organizzatori da responsabilità civili e penali.</label>
         </div>
+    </section>
 
-        <br>
-
-        <label>Dichiaro di partecipare sotto la mia responsabilità</label>
-
-        <div class="radio-group">
-            <label>
-                <input type="radio" name="responsabilita" value="Si" required>
-                Sì
-            </label>
-
-            <label>
-                <input type="radio" name="responsabilita" value="No">
-                No
-            </label>
-        </div>
-
-    </div>
-
-    <button type="submit">
-        INVIA ISCRIZIONE
-    </button>
-
+    <button class="submit-btn" type="submit">Invia iscrizione</button>
 </form>
-```
+{% endif %}
 
-</div>
+<script>
+function toggleDoubleFields() {
+    const sportSelect = document.getElementById("sport");
+    const selected = sportSelect.options[sportSelect.selectedIndex];
+    const isDouble = selected && selected.dataset.double === "1";
+    const section = document.getElementById("double-fields");
+    const ids = ["player2_name", "player2_cf", "player2_phone", "player2_belonging", "player2_address"];
 
-</body>
-</html>
+    if (isDouble) {
+        section.classList.remove("hidden");
+        ids.forEach(id => document.getElementById(id).required = true);
+    } else {
+        section.classList.add("hidden");
+        ids.forEach(id => {
+            document.getElementById(id).required = false;
+            document.getElementById(id).value = "";
+        });
+        document.getElementById("player2_shirt_size_wrap").classList.add("hidden");
+        document.getElementById("player2_shirt_size").required = false;
+        document.getElementById("player2_shirt_size").value = "";
+    }
+}
+
+function updateFeeText() {
+    const sportSelect = document.getElementById("sport");
+    const selected = sportSelect.options[sportSelect.selectedIndex];
+    const feeText = document.getElementById("fee-text");
+
+    if (!selected || !selected.dataset.fee) {
+        feeText.textContent = "Confermo di aver compreso che l'iscrizione ha un costo di ___ da consegnare agli organizzatori prima dell'inizio del torneo. La maglia del proprio rione può essere acquistata a parte a € 5.";
+        return;
+    }
+
+    const fee = Number(selected.dataset.fee).toLocaleString("it-IT", { style: "currency", currency: "EUR" });
+
+    feeText.textContent = `Confermo di aver compreso che l'iscrizione ha un costo di ${fee} da consegnare agli organizzatori prima dell'inizio del torneo per confermare l'iscrizione. Si precisa che la quota di iscrizione non dà diritto alla maglia del proprio rione, acquistabile a parte al costo aggiuntivo di € 5.`;
+}
+
+function toggleShirtSize(player) {
+    const yes = document.querySelector(`input[name="shirt_player${player}"][value="Si"]`);
+    const wrap = document.getElementById(`player${player}_shirt_size_wrap`);
+    const select = document.getElementById(`player${player}_shirt_size`);
+
+    if (yes && yes.checked) {
+        wrap.classList.remove("hidden");
+        select.required = true;
+    } else {
+        wrap.classList.add("hidden");
+        select.required = false;
+        select.value = "";
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    toggleDoubleFields();
+    toggleShirtSize('1');
+    toggleShirtSize('2');
+    updateFeeText();
+});
+</script>
+{% endblock %}
