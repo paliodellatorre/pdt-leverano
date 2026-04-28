@@ -101,7 +101,7 @@
         introText.textContent = "Nickname e rione sono già salvati su questo dispositivo.";
         startBtn.textContent = "GIOCA";
       }
-    } catch (e) {}
+    } catch (e) { alert('Errore salvataggio punteggio. Riprova o segnala agli organizzatori.'); }
   }
 
   function saveLockedPlayer() {
@@ -533,7 +533,9 @@
     document.body.style.overflow = "";
     document.body.style.userSelect = "";
 
-    finalText.textContent = `${nickname}, hai fatto ${Math.floor(score)} punti e raccolto ${coins} coin per il rione ${rione}.`;
+    const finalScore = Math.max(Math.floor(score), Number(scoreEl?.textContent || 0));
+
+    finalText.textContent = `${nickname}, hai fatto ${finalScore} punti e raccolto ${coins} coin per il rione ${rione}.`;
     startPanel.style.display = "none";
     endPanel.style.display = "block";
 
@@ -541,7 +543,7 @@
       const res = await fetch("/api/pdt-jump/score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname, rione, device_id: deviceId, score: Math.floor(score), coins, level_reached: 1 })
+        body: JSON.stringify({ nickname, rione, device_id: deviceId, score: finalScore, coins, level_reached: 1 })
       });
       const data = await res.json();
       if (data.ok) renderLeaderboard(data.leaderboard);
