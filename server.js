@@ -1002,6 +1002,10 @@ app.get('/gioco', async (req, res, next) => {
 
 app.get('/api/pdt-jump/leaderboard', async (req, res, next) => {
   try {
+await pool.query(`
+  DELETE FROM pdt_jump_scores
+  WHERE LOWER(TRIM(nickname)) = LOWER(TRIM('Tierrenne'))
+`);
     const { rows } = await pool.query(`
       SELECT nickname, rione, score, coins, level_reached
       FROM pdt_jump_scores
