@@ -1015,7 +1015,7 @@ app.get('/api/pdt-jump/leaderboard', async (req, res, next) => {
   }
 });
 
-aapp.post('/api/pdt-jump/score', async (req, res, next) => {
+app.post('/api/pdt-jump/score', async (req, res, next) => {
   try {
     const nickname = String(req.body.nickname || '').trim().substring(0, 24);
     const rione = String(req.body.rione || '').trim().substring(0, 60);
