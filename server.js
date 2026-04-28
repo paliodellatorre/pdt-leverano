@@ -982,7 +982,11 @@ app.get('/admin/export/kids', requireAuth, async (req, res, next) => {
 /* PDT JUMP - GIOCO */
 app.get('/gioco', async (req, res, next) => {
   try {
+    // RESET COMPLETO CLASSIFICA PDT JUMP
+    await pool.query(`DELETE FROM pdt_jump_scores`);
+
     const media = await getMediaMap();
+
     const leaderboard = await pool.query(`
       SELECT nickname, rione, score, coins, level_reached
       FROM pdt_jump_scores
