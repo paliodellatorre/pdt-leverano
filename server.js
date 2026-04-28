@@ -1015,7 +1015,7 @@ app.get('/api/pdt-jump/leaderboard', async (req, res, next) => {
   }
 });
 
-app.post('/api/pdt-jump/score', async (req, res, next) => {
+aapp.post('/api/pdt-jump/score', async (req, res, next) => {
   try {
     const nickname = String(req.body.nickname || '').trim().substring(0, 24);
     const rione = String(req.body.rione || '').trim().substring(0, 60);
@@ -1028,81 +1028,17 @@ app.post('/api/pdt-jump/score', async (req, res, next) => {
       return res.status(400).json({ ok: false, error: 'Nickname e rione obbligatori.' });
     }
 
-    /*
-      FIX DEFINITIVO:
-      Ogni nickname compare UNA SOLA VOLTA.
-      Se il nuovo punteggio è migliore, aggiorna quel nickname.
-      Se è peggiore, lascia il record migliore già presente.
-    */
-
-    const existing = await pool.query(
-      `SELECT id, nickname, rione, device_id, score, coins, level_reached
-       FROM pdt_jump_scores
-       WHERE LOWER(TRIM(nickname)) = LOWER(TRIM($1))
-       ORDER BY score DESC, coins DESC, id ASC`,
+    await pool.query(
+      `DELETE FROM pdt_jump_scores
+       WHERE LOWER(TRIM(nickname)) = LOWER(TRIM($1))`,
       [nickname]
     );
 
-    if (existing.rows.length) {
-      const best = existing.rows[0];
-
-      if (score > Number(best.score || 0)) {
-        await pool.query(
-          `UPDATE pdt_jump_scores
-           SET rione = $1,
-               device_id = NULLIF($2, ''),
-               score = $3,
-               coins = $4,
-               level_reached = $5,
-               created_at = NOW()
-           WHERE id = $6`,
-          [rione, deviceId, score, coins, levelReached, best.id]
-        );
-      } else if (score === Number(best.score || 0) && coins > Number(best.coins || 0)) {
-        await pool.query(
-          `UPDATE pdt_jump_scores
-           SET rione = $1,
-               device_id = COALESCE(device_id, NULLIF($2, '')),
-               coins = $3,
-               level_reached = GREATEST(level_reached, $4)
-           WHERE id = $5`,
-          [rione, deviceId, coins, levelReached, best.id]
-        );
-      } else if (deviceId && !best.device_id) {
-        await pool.query(
-          `UPDATE pdt_jump_scores
-           SET device_id = $1
-           WHERE id = $2`,
-          [deviceId, best.id]
-        );
-      }
-
-      // Cancella eventuali altri record dello stesso nickname.
-      await pool.query(
-        `DELETE FROM pdt_jump_scores
-         WHERE LOWER(TRIM(nickname)) = LOWER(TRIM($1))
-           AND id <> $2`,
-        [nickname, best.id]
-      );
-    } else {
-      await pool.query(
-        `INSERT INTO pdt_jump_scores (nickname, rione, device_id, score, coins, level_reached, created_at)
-         VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, NOW())`,
-        [nickname, rione, deviceId, score, coins, levelReached]
-      );
-    }
-
-    // Pulizia generale: un solo record per nickname, tiene il migliore.
-    await pool.query(`
-      DELETE FROM pdt_jump_scores a
-      USING pdt_jump_scores b
-      WHERE LOWER(TRIM(a.nickname)) = LOWER(TRIM(b.nickname))
-        AND (
-          a.score < b.score
-          OR (a.score = b.score AND a.coins < b.coins)
-          OR (a.score = b.score AND a.coins = b.coins AND a.id > b.id)
-        )
-    `);
+    await pool.query(
+      `INSERT INTO pdt_jump_scores (nickname, rione, device_id, score, coins, level_reached, created_at)
+       VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, NOW())`,
+      [nickname, rione, deviceId, score, coins, levelReached]
+    );
 
     const { rows } = await pool.query(`
       SELECT nickname, rione, score, coins, level_reached
